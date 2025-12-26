@@ -4,6 +4,11 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SeguridadModule } from './seguridad/seguridad.module';
 import { AfiliadosModule } from './afiliados/afiliados.module';
+import { CatalogosModule } from './catalogos/catalogos.module';
+import { AportesModule } from './aportes/aportes.module';
+import { PrestamosModule } from './prestamos/prestamos.module';
+import { MobileModule } from './mobile/mobile.module';
+import { OperacionesModule } from './operaciones/operaciones.module';
 
 @Module({
   imports: [
@@ -25,6 +30,11 @@ import { AfiliadosModule } from './afiliados/afiliados.module';
     }),
     SeguridadModule,
     AfiliadosModule,
+    CatalogosModule,
+    AportesModule,
+    PrestamosModule,
+    MobileModule,
+    OperacionesModule,
   ],
 })
 export class AppModule {}

@@ -11,7 +11,7 @@ import { Modulo } from './modulo.entity';
 @Entity({ schema: 'seguridad', name: 'rol_modulo_permiso' })
 export class RolModuloPermiso {
   @PrimaryGeneratedColumn()
-  id: number; // INT
+  rol_modulo_permiso_id: number; // INT
 
   @ManyToOne(() => Rol)
   @JoinColumn({ name: 'rol_id' })

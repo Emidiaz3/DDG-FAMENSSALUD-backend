@@ -24,22 +24,22 @@ export function fail(
   };
 }
 
-export function paginatedOk<T>(
-  items: T[],
-  total: number,
-  page: number,
-  pageSize: number,
-): PaginatedResponse<T> {
-  const totalPages = Math.ceil(total / pageSize);
+// export function paginatedOk<T>(
+//   items: T[],
+//   total: number,
+//   page: number,
+//   pageSize: number,
+// ): PaginatedResponse<T> {
+//   const totalPages = Math.ceil(total / pageSize);
 
-  return {
-    status: 'success',
-    data: {
-      items,
-      total,
-      page,
-      pageSize,
-      totalPages,
-    },
-  };
-}
+//   return {
+//     status: 'success',
+//     data: {
+//       items,
+//       total,
+//       page,
+//       pageSize,
+//       totalPages,
+//     },
+//   };
+// }

@@ -1,15 +1,16 @@
 // src/seguridad/auth/auth.service.ts
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { JwtService, JwtSignOptions } from '@nestjs/jwt'; // 👈 IMPORT CORRECTO
+import { JwtService } from '@nestjs/jwt'; // 👈 IMPORT CORRECTO
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 
 import { UsuarioService } from '../usuario.service';
 import { Usuario } from '../entities/usuario.entity';
 import { LoginDto } from './dto/login.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { JwtPayload } from './jwt-payload.interface';
-import { ApiResponse } from '../../common/interfaces/api-response.interface';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Afiliado } from 'src/afiliados/entities/afiliado.entity';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class AuthService {
@@ -17,24 +18,43 @@ export class AuthService {
     private readonly usuariosService: UsuarioService,
     private readonly jwtService: JwtService, // 👈 TIPO BIEN DEFINIDO
     private readonly configService: ConfigService,
+    @InjectRepository(Afiliado)
+    private readonly afiliadoRepo: Repository<Afiliado>,
   ) {}
 
-  private buildPayload(usuario: Usuario): JwtPayload {
+  private buildPayload(
+    usuario: Usuario,
+    afiliadoId: number | null,
+  ): JwtPayload {
     return {
-      sub: usuario.id,
+      sub: usuario.usuario_id,
       username: usuario.nombre_usuario,
       rolId: usuario.rol_id,
+      afiliadoId,
     };
+  }
+
+  private async getAfiliadoIdByUsuario(
+    usuarioId: number,
+  ): Promise<number | null> {
+    const afiliado = await this.afiliadoRepo.findOne({
+      where: { usuario_id: usuarioId },
+      select: ['afiliado_id'],
+    });
+
+    return afiliado?.afiliado_id ?? null;
   }
 
   private async generateTokens(
     usuario: Usuario,
   ): Promise<{ accessToken: string; refreshToken: string }> {
-    const payload = this.buildPayload(usuario);
+    const afiliadoId = await this.getAfiliadoIdByUsuario(usuario.usuario_id);
+
+    const payload = this.buildPayload(usuario, afiliadoId);
 
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: this.configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
-      expiresIn: '60s', // 👈 1 minuto
+      expiresIn: '60m', // 👈 1 minuto
     });
 
     const refreshToken = await this.jwtService.signAsync(payload, {
@@ -73,7 +93,6 @@ export class AuthService {
       actualizado_en: Date;
     };
   }> {
-
     const usuario = await this.usuariosService.findByNombreUsuario(
       dto.nombre_usuario,
     );
@@ -98,7 +117,7 @@ export class AuthService {
     await this.usuariosService.save(usuario);
 
     const user = {
-      id: usuario.id,
+      id: usuario.usuario_id,
       nombre_usuario: usuario.nombre_usuario,
       nombre_completo: usuario.nombre_completo,
       correo: usuario.correo ?? null,
@@ -142,7 +161,7 @@ export class AuthService {
     await this.saveRefreshToken(usuario, newRefreshToken);
 
     const user = {
-      id: usuario.id,
+      id: usuario.usuario_id,
       nombre_usuario: usuario.nombre_usuario,
       nombre_completo: usuario.nombre_completo,
       correo: usuario.correo ?? null,

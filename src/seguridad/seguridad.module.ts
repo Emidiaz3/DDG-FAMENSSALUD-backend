@@ -15,11 +15,12 @@ import { AuthService } from './auth/auth.service';
 import { AuthController } from './auth/auth.controller';
 import { JwtStrategy } from './auth/jwt.strategy';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { Afiliado } from 'src/afiliados/entities/afiliado.entity';
 
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([Usuario, Rol]),
+    TypeOrmModule.forFeature([Usuario, Rol, Afiliado]),
     PassportModule.register({ defaultStrategy: 'jwt' }), // 👈 AÑADIR ESTO
     JwtModule.registerAsync({
       inject: [ConfigService],

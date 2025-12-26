@@ -16,13 +16,15 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: JwtPayload) {
-    // 👇 pon esto temporalmente para ver si entra aquí
     console.log('JWT validate payload', payload);
 
     return {
       id: payload.sub,
       username: payload.username,
       rolId: payload.rolId,
+
+      // ✅ DEVOLVERLO
+      afiliadoId: payload.afiliadoId ?? null,
     };
   }
 }

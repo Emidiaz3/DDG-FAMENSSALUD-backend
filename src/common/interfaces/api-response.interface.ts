@@ -1,3 +1,5 @@
+import { PaginatedData } from './pagination.interface';
+
 export interface ApiError {
   field?: string;
   message: string;
@@ -11,16 +13,4 @@ export interface ApiResponse<T = any> {
   message?: string;
 }
 
-export interface PaginatedData<T> {
-  items: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-}
-
-export interface PaginatedResponse<T> {
-  status: 'success' | 'error';
-  data: PaginatedData<T>;
-  errors?: ApiError[];
-}
+export type PaginatedResponse<T> = ApiResponse<PaginatedData<T>>;

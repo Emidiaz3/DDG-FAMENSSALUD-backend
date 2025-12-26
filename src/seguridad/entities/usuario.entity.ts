@@ -10,7 +10,7 @@ import { Rol } from './rol.entity';
 @Entity({ schema: 'seguridad', name: 'usuario' })
 export class Usuario {
   @PrimaryGeneratedColumn()
-  id: number; // INT IDENTITY
+  usuario_id: number; // INT IDENTITY
 
   @Column({ length: 50, unique: true })
   nombre_usuario: string;

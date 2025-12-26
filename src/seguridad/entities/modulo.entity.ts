@@ -9,7 +9,7 @@ import {
 @Entity({ schema: 'seguridad', name: 'modulo' })
 export class Modulo {
   @PrimaryGeneratedColumn()
-  id: number; // INT
+  modulo_id: number; // INT
 
   @Column({ length: 100 })
   nombre: string;

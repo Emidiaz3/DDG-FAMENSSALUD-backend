@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   IsNotEmpty,
   IsOptional,
@@ -5,9 +6,17 @@ import {
   IsInt,
   IsDateString,
   Length,
+  ValidateNested,
 } from 'class-validator';
+import { GuardarCuentaBancariaDto } from './guardar-cuenta-bancaria.dto';
+import { GuardarSobreBeneficiarioDto } from './guardar-sobre-beneficiario.dto';
 
-export class CrearAfiliadoDto {
+export class GuardarAfiliadoDto {
+  // 👇 Solo cuando sea actualización
+  @IsOptional()
+  @IsInt()
+  id?: number;
+
   // --- Identificación ---
   @IsNotEmpty()
   @IsString()
@@ -16,7 +25,7 @@ export class CrearAfiliadoDto {
 
   @IsOptional()
   @IsString()
-  @Length(8, 20) // DNI normalmente 8, pero puede haber otros formatos
+  @Length(8, 20)
   doc_identidad?: string;
 
   @IsNotEmpty()
@@ -24,10 +33,10 @@ export class CrearAfiliadoDto {
   @Length(1, 50)
   ap_paterno: string;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
   @Length(1, 50)
-  ap_materno?: string;
+  ap_materno: string;
 
   @IsNotEmpty()
   @IsString()
@@ -72,17 +81,32 @@ export class CrearAfiliadoDto {
   @IsInt()
   base_id?: number;
 
-  @IsNotEmpty()
-  @IsDateString()
-  fecha_ingreso: string; // YYYY-MM-DD
+  @IsOptional()
+  @IsInt()
+  regimen_laboral_id?: number;
 
   @IsNotEmpty()
   @IsDateString()
-  fecha_nacimiento: string; // YYYY-MM-DD
+  fecha_ingreso: string;
+
+  @IsNotEmpty()
+  @IsDateString()
+  fecha_nacimiento: string;
 
   // --- Estado ---
   @IsOptional()
   @IsString()
   @Length(0, 20)
-  estado?: string; // Se setea 'ACTIVO' por defecto si no se manda
+  estado?: string; // No se modifica en update
+
+  // --- Cuenta bancaria (histórica) ---
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => GuardarCuentaBancariaDto)
+  cuenta_bancaria?: GuardarCuentaBancariaDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => GuardarSobreBeneficiarioDto)
+  sobre_beneficiario?: GuardarSobreBeneficiarioDto;
 }

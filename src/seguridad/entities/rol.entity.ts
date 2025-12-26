@@ -1,9 +1,10 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { Usuario } from './usuario.entity';
 
 @Entity({ schema: 'seguridad', name: 'rol' })
 export class Rol {
   @PrimaryGeneratedColumn()
-  id: number; // INT IDENTITY
+  rol_id: number; // INT IDENTITY
 
   @Column({ length: 100 })
   nombre: string;
@@ -19,4 +20,7 @@ export class Rol {
 
   @Column({ type: 'datetime2', default: () => 'SYSDATETIME()' })
   actualizado_en: Date;
+
+  @OneToMany(() => Usuario, (u) => u.rol)
+  usuarios: Usuario[];
 }
