@@ -65,6 +65,72 @@ export class DevolucionesService {
     return { items, total };
   }
 
+  async listarPaginadoPorAfiliadoActual(params: {
+    afiliado_id: number;
+    page: number;
+    limit: number;
+    fecha_desde?: string;
+    fecha_hasta?: string;
+  }): Promise<{ items: Devolucion[]; total: number }> {
+    const { afiliado_id, page, limit, fecha_desde, fecha_hasta } = params;
+
+    // 1) Validar afiliado
+    const afiliado = await this.afiliadoRepo.findOne({
+      where: { afiliado_id },
+    });
+
+    if (!afiliado) {
+      throw new NotFoundException({
+        status: 'error',
+        message: 'El afiliado no existe.',
+      });
+    }
+
+    // 2) Historial activo
+    const historialActivo = await this.historialRepo.findOne({
+      where: { afiliado_id: afiliado.afiliado_id, es_activo: true },
+      order: { fecha_inicio: 'DESC' },
+    });
+
+    if (!historialActivo) {
+      return { items: [], total: 0 };
+    }
+
+    const skip = (page - 1) * limit;
+
+    // 3) Query paginada (solo el historial activo)
+    const qb = this.devolucionRepo
+      .createQueryBuilder('d')
+      .where('d.afiliado_id = :afiliadoId', {
+        afiliadoId: afiliado.afiliado_id,
+      })
+      .andWhere('d.afiliacion_historial_id = :historialId', {
+        historialId: historialActivo.afiliacion_historial_id,
+      });
+
+    if (fecha_desde) {
+      qb.andWhere('d.fecha_devolucion >= :desde', { desde: fecha_desde });
+    }
+
+    if (fecha_hasta) {
+      qb.andWhere('d.fecha_devolucion <= :hasta', { hasta: fecha_hasta });
+    }
+
+    qb.orderBy('d.fecha_devolucion', 'DESC').offset(skip).limit(limit);
+
+    // total
+    const totalQb = qb.clone();
+    totalQb
+      .offset(undefined as any)
+      .limit(undefined as any)
+      .orderBy();
+
+    const total = await totalQb.getCount();
+    const items = await qb.getMany();
+
+    return { items, total };
+  }
+
   async guardar(
     dto: GuardarDevolucionDto,
     ctx: AuditoriaContext,

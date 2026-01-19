@@ -918,6 +918,29 @@ export class PrestamosService {
     return { items, total };
   }
 
+  // prestamos.service.ts
+
+  private async getPrestamoOrFail(prestamoId: number) {
+    const prestamo = await this.prestamoRepo.findOne({
+      where: { prestamo_id: prestamoId },
+      relations: [
+        'tipo_prestamo',
+        'afiliado',
+        'afiliado.departamento',
+        'afiliado.base',
+      ],
+    });
+
+    if (!prestamo) {
+      throw new NotFoundException({
+        status: 'error',
+        message: 'El préstamo no existe.',
+      });
+    }
+
+    return prestamo;
+  }
+
   async obtenerInfoPrestamoModal(prestamoId: number): Promise<{
     solicitante: {
       codigo_trabajador: string;
@@ -938,52 +961,18 @@ export class PrestamosService {
       tipo_prestamo_id: number;
       tipo_prestamo: any;
       interes_mensual: number;
-
       monto_prestamo: number;
       numero_cuotas_pactadas: number;
-
       monto_gastos_operativos: number;
       monto_gasto_adm_cuota: number;
-
       monto_girado_banco: number;
       porcentaje_seguro: number;
       monto_seguro: number;
     };
-    kpis_amortizaciones: {
-      monto_prestado: number;
-      deuda_total: number;
-      monto_girado_banco: number;
-    };
-    acumulados_amortizados: {
-      monto_amortizado_total: number;
-      capital_total: number;
-      interes_total: number;
-      gastos_adm_total: number;
-      exceso_total: number;
-      mora_total: number;
-    };
   }> {
-    // 1) Traer préstamo + relaciones necesarias
-    const prestamo = await this.prestamoRepo.findOne({
-      where: { prestamo_id: prestamoId },
-      relations: [
-        'tipo_prestamo',
-        'afiliado',
-        'afiliado.departamento',
-        'afiliado.base',
-      ],
-    });
-
-    if (!prestamo) {
-      throw new NotFoundException({
-        status: 'error',
-        message: 'El préstamo no existe.',
-      });
-    }
-
+    const prestamo = await this.getPrestamoOrFail(prestamoId);
     const a = prestamo.afiliado;
 
-    // 2) Fecha de afiliación: uso afiliado.fecha_ingreso (más estable)
     const fechaAfiliacion = a?.fecha_ingreso ? toYmd(a.fecha_ingreso) : null;
 
     const departamentoBase = `${a?.departamento?.nombre ?? ''}${
@@ -992,26 +981,6 @@ export class PrestamosService {
 
     const nombreCompleto =
       `${a.ap_paterno} ${a.ap_materno} ${a.nombres}`.trim();
-
-    // 3) Acumulados amortizados (sumatoria de pagos NO anulados)
-    const sums = await this.pagoRepo
-      .createQueryBuilder('pg')
-      .select('COALESCE(SUM(pg.monto_pago), 0)', 'monto_amortizado_total')
-      .addSelect('COALESCE(SUM(pg.monto_capital), 0)', 'capital_total')
-      .addSelect('COALESCE(SUM(pg.monto_interes), 0)', 'interes_total')
-      .addSelect('COALESCE(SUM(pg.monto_gasto_adm), 0)', 'gastos_adm_total')
-      .addSelect('COALESCE(SUM(pg.monto_exceso), 0)', 'exceso_total')
-      .addSelect('COALESCE(SUM(pg.monto_mora), 0)', 'mora_total')
-      .where('pg.prestamo_id = :prestamoId', { prestamoId })
-      .andWhere('pg.es_anulado = 0')
-      .getRawOne<{
-        monto_amortizado_total: string;
-        capital_total: string;
-        interes_total: string;
-        gastos_adm_total: string;
-        exceso_total: string;
-        mora_total: string;
-      }>();
 
     return {
       solicitante: {
@@ -1026,11 +995,7 @@ export class PrestamosService {
         cuota_mensual: Number(prestamo.cuota_mensual),
         monto_capital_cuota: Number(prestamo.monto_capital_cuota),
         monto_interes_cuota: Number(prestamo.monto_interes_cuota),
-
-        // En tu modelo: monto_gastos_operativos es del préstamo
         monto_gastos_operativos: Number(prestamo.monto_gastos_operativos),
-
-        // gasto admin por cuota configurado en préstamo
         monto_gasto_adm_cuota: Number(prestamo.monto_gasto_adm_cuota),
       },
 
@@ -1052,21 +1017,62 @@ export class PrestamosService {
         porcentaje_seguro: Number(prestamo.porcentaje_seguro),
         monto_seguro: Number(prestamo.monto_seguro),
       },
+    };
+  }
 
-      kpis_amortizaciones: {
-        monto_prestado: Number(prestamo.monto_prestamo),
-        deuda_total: Number(prestamo.monto_saldo), // va bajando con pagos
-        monto_girado_banco: Number(prestamo.monto_girado_banco),
-      },
+  async obtenerKpisAmortizaciones(prestamoId: number): Promise<{
+    monto_prestado: number;
+    deuda_total: number;
+    monto_girado_banco: number;
+  }> {
+    const prestamo = await this.getPrestamoOrFail(prestamoId);
 
-      acumulados_amortizados: {
-        monto_amortizado_total: Number(sums?.monto_amortizado_total ?? 0),
-        capital_total: Number(sums?.capital_total ?? 0),
-        interes_total: Number(sums?.interes_total ?? 0),
-        gastos_adm_total: Number(sums?.gastos_adm_total ?? 0),
-        exceso_total: Number(sums?.exceso_total ?? 0),
-        mora_total: Number(sums?.mora_total ?? 0),
-      },
+    // data DIRECTO (sin kpis_amortizaciones wrapper)
+    return {
+      monto_prestado: Number(prestamo.monto_prestamo),
+      deuda_total: Number(prestamo.monto_saldo),
+      monto_girado_banco: Number(prestamo.monto_girado_banco),
+    };
+  }
+
+  async obtenerAcumuladosAmortizados(prestamoId: number): Promise<{
+    monto_amortizado_total: number;
+    capital_total: number;
+    interes_total: number;
+    gastos_adm_total: number;
+    exceso_total: number;
+    mora_total: number;
+  }> {
+    // validar existencia (y evitar sumar de un prestamoId inexistente)
+    await this.getPrestamoOrFail(prestamoId);
+
+    const sums = await this.pagoRepo
+      .createQueryBuilder('pg')
+      .select('COALESCE(SUM(pg.monto_pago), 0)', 'monto_amortizado_total')
+      .addSelect('COALESCE(SUM(pg.monto_capital), 0)', 'capital_total')
+      .addSelect('COALESCE(SUM(pg.monto_interes), 0)', 'interes_total')
+      .addSelect('COALESCE(SUM(pg.monto_gasto_adm), 0)', 'gastos_adm_total')
+      .addSelect('COALESCE(SUM(pg.monto_exceso), 0)', 'exceso_total')
+      .addSelect('COALESCE(SUM(pg.monto_mora), 0)', 'mora_total')
+      .where('pg.prestamo_id = :prestamoId', { prestamoId })
+      .andWhere('pg.es_anulado = 0')
+      .getRawOne<{
+        monto_amortizado_total: string;
+        capital_total: string;
+        interes_total: string;
+        gastos_adm_total: string;
+        exceso_total: string;
+        mora_total: string;
+      }>();
+
+    // data DIRECTO (sin acumulados_amortizados wrapper)
+    return {
+      monto_amortizado_total: Number(sums?.monto_amortizado_total ?? 0),
+      capital_total: Number(sums?.capital_total ?? 0),
+      interes_total: Number(sums?.interes_total ?? 0),
+      gastos_adm_total: Number(sums?.gastos_adm_total ?? 0),
+      exceso_total: Number(sums?.exceso_total ?? 0),
+      mora_total: Number(sums?.mora_total ?? 0),
     };
   }
 }

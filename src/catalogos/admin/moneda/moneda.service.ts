@@ -28,6 +28,41 @@ export class MonedaService {
     return { status: 'success', data };
   }
 
+  async listarPaginado(params: {
+    page: number;
+    limit: number;
+    search?: string;
+  }): Promise<{ items: any[]; total: number }> {
+    const { page, limit, search } = params;
+    const skip = (page - 1) * limit;
+
+    const qb = this.repo
+      .createQueryBuilder('m')
+      .select(['m.moneda_id AS moneda_id', 'm.nombre AS nombre']);
+
+    if (search && search.trim() !== '') {
+      const term = `%${search.trim()}%`;
+      qb.andWhere('m.nombre LIKE :term', { term });
+    }
+
+    qb.orderBy('m.nombre', 'ASC').offset(skip).limit(limit);
+
+    const totalQb = qb.clone();
+    totalQb
+      .offset(undefined as any)
+      .limit(undefined as any)
+      .orderBy();
+    const total = await totalQb.getCount();
+
+    const rows = await qb.getRawMany();
+    const items = rows.map((r) => ({
+      moneda_id: Number(r.moneda_id),
+      nombre: r.nombre,
+    }));
+
+    return { items, total };
+  }
+
   async crear(dto: CrearMonedaDto, ctx?: AuditContext) {
     return this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(Moneda);

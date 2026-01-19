@@ -64,6 +64,73 @@ export class ExcesosService {
     return { items, total };
   }
 
+  async listarPaginadoPorAfiliadoActual(params: {
+    afiliado_id: number;
+    page: number;
+    limit: number;
+    fecha_desde?: string;
+    fecha_hasta?: string;
+  }): Promise<{ items: Exceso[]; total: number }> {
+    const { afiliado_id, page, limit, fecha_desde, fecha_hasta } = params;
+
+    // 1) Validar afiliado
+    const afiliado = await this.afiliadoRepo.findOne({
+      where: { afiliado_id },
+    });
+
+    if (!afiliado) {
+      throw new NotFoundException({
+        status: 'error',
+        message: 'El afiliado no existe.',
+      });
+    }
+
+    // 2) Historial activo
+    const historialActivo = await this.historialRepo.findOne({
+      where: { afiliado_id: afiliado.afiliado_id, es_activo: true },
+      order: { fecha_inicio: 'DESC' },
+    });
+
+    if (!historialActivo) {
+      // Afiliado retirado o datos viejos sin historial activo
+      return { items: [], total: 0 };
+    }
+
+    const skip = (page - 1) * limit;
+
+    // 3) Query paginada (solo el historial activo)
+    const qb = this.excesoRepo
+      .createQueryBuilder('e')
+      .where('e.afiliado_id = :afiliadoId', {
+        afiliadoId: afiliado.afiliado_id,
+      })
+      .andWhere('e.afiliacion_historial_id = :historialId', {
+        historialId: historialActivo.afiliacion_historial_id,
+      });
+
+    if (fecha_desde) {
+      qb.andWhere('e.fecha_exceso >= :desde', { desde: fecha_desde });
+    }
+
+    if (fecha_hasta) {
+      qb.andWhere('e.fecha_exceso <= :hasta', { hasta: fecha_hasta });
+    }
+
+    qb.orderBy('e.fecha_exceso', 'DESC').offset(skip).limit(limit);
+
+    // total
+    const totalQb = qb.clone();
+    totalQb
+      .offset(undefined as any)
+      .limit(undefined as any)
+      .orderBy();
+
+    const total = await totalQb.getCount();
+    const items = await qb.getMany();
+
+    return { items, total };
+  }
+
   async guardar(dto: GuardarExcesoDto, ctx: AuditoriaContext): Promise<Exceso> {
     return this.dataSource.transaction(async (manager) => {
       const excesoRepo = manager.getRepository(Exceso);

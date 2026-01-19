@@ -28,6 +28,41 @@ export class BancoService {
     return { status: 'success', data };
   }
 
+  async listarPaginado(params: {
+    page: number;
+    limit: number;
+    search?: string;
+  }): Promise<{ items: any[]; total: number }> {
+    const { page, limit, search } = params;
+    const skip = (page - 1) * limit;
+
+    const qb = this.repo
+      .createQueryBuilder('b')
+      .select(['b.banco_id AS banco_id', 'b.nombre AS nombre']);
+
+    if (search && search.trim() !== '') {
+      const term = `%${search.trim()}%`;
+      qb.andWhere('b.nombre LIKE :term', { term });
+    }
+
+    qb.orderBy('b.nombre', 'ASC').offset(skip).limit(limit);
+
+    const totalQb = qb.clone();
+    totalQb
+      .offset(undefined as any)
+      .limit(undefined as any)
+      .orderBy();
+    const total = await totalQb.getCount();
+
+    const rows = await qb.getRawMany();
+    const items = rows.map((r) => ({
+      banco_id: Number(r.banco_id),
+      nombre: r.nombre,
+    }));
+
+    return { items, total };
+  }
+
   async crear(dto: CrearBancoDto, ctx?: AuditContext) {
     return this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(Banco);

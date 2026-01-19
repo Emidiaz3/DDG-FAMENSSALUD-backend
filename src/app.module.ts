@@ -9,6 +9,7 @@ import { AportesModule } from './aportes/aportes.module';
 import { PrestamosModule } from './prestamos/prestamos.module';
 import { MobileModule } from './mobile/mobile.module';
 import { OperacionesModule } from './operaciones/operaciones.module';
+import { PlanillasModule } from './planillas/planillas.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { OperacionesModule } from './operaciones/operaciones.module';
     PrestamosModule,
     MobileModule,
     OperacionesModule,
+    PlanillasModule,
   ],
 })
 export class AppModule {}

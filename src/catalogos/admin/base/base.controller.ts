@@ -14,6 +14,9 @@ import { JwtAuthGuard } from 'src/seguridad/auth/jwt-auth.guard';
 import { getClientIp } from 'src/auditoria/utils/ip';
 import { ok } from 'src/common/utils/api-response.util';
 import { BaseService } from './base.service';
+import { ListarBasesQueryDto } from './dto/listar-bases-query.dto';
+import { PaginatedResponse } from 'src/common/interfaces/api-response.interface';
+import { okPaginated } from 'src/common/utils/pagination.util';
 
 type CrearBaseDto = {
   nombre: string;
@@ -32,6 +35,31 @@ export class BaseController {
     const depId = departamento_id ? Number(departamento_id) : undefined;
     const data = await this.service.listar(depId);
     return ok(data.data, 'Lista de bases recuperada exitosamente');
+  }
+
+  @Get('paginado')
+  async listarPaginado(
+    @Query() query: ListarBasesQueryDto,
+  ): Promise<PaginatedResponse<any>> {
+    const page = Number(query.page ?? 1);
+    const limit = Number(query.limit ?? 25);
+    const safePage = Number.isFinite(page) && page > 0 ? page : 1;
+    const safeLimit = Number.isFinite(limit) && limit > 0 ? limit : 25;
+
+    const { items, total } = await this.service.listarPaginado({
+      page: safePage,
+      limit: safeLimit,
+      search: query.search,
+      departamento_id: query.departamento_id,
+    });
+
+    return okPaginated(
+      items,
+      total,
+      safePage,
+      safeLimit,
+      'Lista paginada de bases recuperada exitosamente',
+    );
   }
 
   @Post()

@@ -50,6 +50,35 @@ export class ExcesosController {
     );
   }
 
+  @Get('afiliado/:afiliadoId')
+  async listarPorAfiliadoActual(
+    @Param('afiliadoId') afiliadoId: string,
+    @Query() query: ListarOperacionesQueryDto,
+  ): Promise<PaginatedResponse<Exceso>> {
+    const page = Number(query.page ?? 1);
+    const limit = Number(query.limit ?? 25);
+
+    const safePage = Number.isFinite(page) && page > 0 ? page : 1;
+    const safeLimit = Number.isFinite(limit) && limit > 0 ? limit : 25;
+
+    const { items, total } =
+      await this.excesosService.listarPaginadoPorAfiliadoActual({
+        afiliado_id: Number(afiliadoId),
+        page: safePage,
+        limit: safeLimit,
+        fecha_desde: query.fecha_desde,
+        fecha_hasta: query.fecha_hasta,
+      });
+
+    return okPaginated(
+      items,
+      total,
+      safePage,
+      safeLimit,
+      'Lista de excesos del afiliado (afiliación activa) recuperada exitosamente',
+    );
+  }
+
   // -------------------------
   // POST /operaciones/excesos
   // -------------------------

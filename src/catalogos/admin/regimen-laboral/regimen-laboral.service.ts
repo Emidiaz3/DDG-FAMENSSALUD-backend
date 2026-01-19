@@ -28,6 +28,44 @@ export class RegimenLaboralService {
     return { status: 'success', data };
   }
 
+  async listarPaginado(params: {
+    page: number;
+    limit: number;
+    search?: string;
+  }): Promise<{ items: any[]; total: number }> {
+    const { page, limit, search } = params;
+    const skip = (page - 1) * limit;
+
+    const qb = this.repo
+      .createQueryBuilder('r')
+      .select([
+        'r.regimen_laboral_id AS regimen_laboral_id',
+        'r.nombre AS nombre',
+      ]);
+
+    if (search && search.trim() !== '') {
+      const term = `%${search.trim()}%`;
+      qb.andWhere('r.nombre LIKE :term', { term });
+    }
+
+    qb.orderBy('r.nombre', 'ASC').offset(skip).limit(limit);
+
+    const totalQb = qb.clone();
+    totalQb
+      .offset(undefined as any)
+      .limit(undefined as any)
+      .orderBy();
+    const total = await totalQb.getCount();
+
+    const rows = await qb.getRawMany();
+    const items = rows.map((r) => ({
+      regimen_laboral_id: Number(r.regimen_laboral_id),
+      nombre: r.nombre,
+    }));
+
+    return { items, total };
+  }
+
   async crear(dto: CrearRegimenDto, ctx?: AuditContext) {
     return this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(RegimenLaboral);

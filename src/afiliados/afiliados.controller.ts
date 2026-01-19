@@ -134,7 +134,7 @@ export class AfiliadosController {
     );
   }
 
-  @Get(':id/detalleNew')
+  @Get(':id/detalleAfiliado')
   @ApiResponse()
   async obtenerDetalleAfiliadoNew(@Param('id', ParseIntPipe) id: number) {
     return {

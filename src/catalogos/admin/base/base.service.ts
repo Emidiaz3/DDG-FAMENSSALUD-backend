@@ -34,6 +34,53 @@ export class BaseService {
     return { status: 'success', data };
   }
 
+  async listarPaginado(params: {
+    page: number;
+    limit: number;
+    search?: string;
+    departamento_id?: number;
+  }): Promise<{ items: any[]; total: number }> {
+    const { page, limit, search, departamento_id } = params;
+    const skip = (page - 1) * limit;
+
+    const qb = this.repo
+      .createQueryBuilder('b')
+      .select([
+        'b.base_id AS base_id',
+        'b.nombre AS nombre',
+        'b.codigo AS codigo',
+        'b.departamento_id AS departamento_id',
+      ]);
+
+    if (departamento_id) {
+      qb.andWhere('b.departamento_id = :dep', { dep: departamento_id });
+    }
+
+    if (search && search.trim() !== '') {
+      const term = `%${search.trim()}%`;
+      qb.andWhere('(b.nombre LIKE :term OR b.codigo LIKE :term)', { term });
+    }
+
+    qb.orderBy('b.nombre', 'ASC').offset(skip).limit(limit);
+
+    const totalQb = qb.clone();
+    totalQb
+      .offset(undefined as any)
+      .limit(undefined as any)
+      .orderBy();
+    const total = await totalQb.getCount();
+
+    const rows = await qb.getRawMany();
+    const items = rows.map((r) => ({
+      base_id: Number(r.base_id),
+      nombre: r.nombre,
+      codigo: r.codigo ?? null,
+      departamento_id: r.departamento_id ? Number(r.departamento_id) : null,
+    }));
+
+    return { items, total };
+  }
+
   async crear(dto: CrearBaseDto, ctx?: AuditContext) {
     return this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(Base);

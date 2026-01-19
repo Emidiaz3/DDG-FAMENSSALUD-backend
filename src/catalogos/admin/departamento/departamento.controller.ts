@@ -14,6 +14,9 @@ import { JwtAuthGuard } from 'src/seguridad/auth/jwt-auth.guard';
 import { getClientIp } from 'src/auditoria/utils/ip';
 import { ok } from 'src/common/utils/api-response.util';
 import { DepartamentoService } from './departamento.service';
+import { ListarDepartamentosQueryDto } from './dto/listar-departamentos-query.dto';
+import { PaginatedResponse } from 'src/common/interfaces/api-response.interface';
+import { okPaginated } from 'src/common/utils/pagination.util';
 
 type CrearDepartamentoDto = { pais_id: number; nombre: string };
 type ActualizarDepartamentoDto = { pais_id?: number; nombre?: string };
@@ -28,6 +31,31 @@ export class DepartamentoController {
     const pid = pais_id ? Number(pais_id) : undefined;
     const data = await this.service.listar(pid);
     return ok(data.data, 'Lista de departamentos recuperada exitosamente');
+  }
+
+  @Get('paginado')
+  async listarPaginado(
+    @Query() query: ListarDepartamentosQueryDto,
+  ): Promise<PaginatedResponse<any>> {
+    const page = Number(query.page ?? 1);
+    const limit = Number(query.limit ?? 25);
+    const safePage = Number.isFinite(page) && page > 0 ? page : 1;
+    const safeLimit = Number.isFinite(limit) && limit > 0 ? limit : 25;
+
+    const { items, total } = await this.service.listarPaginado({
+      page: safePage,
+      limit: safeLimit,
+      search: query.search,
+      pais_id: query.pais_id,
+    });
+
+    return okPaginated(
+      items,
+      total,
+      safePage,
+      safeLimit,
+      'Lista paginada de departamentos recuperada exitosamente',
+    );
   }
 
   @Post()

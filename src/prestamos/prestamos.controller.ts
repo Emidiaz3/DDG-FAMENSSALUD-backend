@@ -78,7 +78,6 @@ export class PrestamosController {
     return okPaginated(items, total, safePage, safeLimit, 'Pagos del préstamo');
   }
 
-  // prestamos.controller.ts
   @Get(':prestamoId/info')
   async infoPrestamoModal(
     @Param('prestamoId', ParseIntPipe) prestamoId: number,
@@ -90,6 +89,32 @@ export class PrestamosController {
       status: 'success',
       data,
       message: 'Información del préstamo',
+    };
+  }
+
+  @Get(':prestamoId/kpis')
+  async kpisPrestamo(@Param('prestamoId', ParseIntPipe) prestamoId: number) {
+    const data =
+      await this.prestamosService.obtenerKpisAmortizaciones(prestamoId);
+
+    return {
+      status: 'success',
+      data, // <- directo, sin wrapper
+      message: 'KPIs de amortizaciones',
+    };
+  }
+
+  @Get(':prestamoId/acumulados')
+  async acumuladosPrestamo(
+    @Param('prestamoId', ParseIntPipe) prestamoId: number,
+  ) {
+    const data =
+      await this.prestamosService.obtenerAcumuladosAmortizados(prestamoId);
+
+    return {
+      status: 'success',
+      data, // <- directo, sin wrapper
+      message: 'Acumulados amortizados',
     };
   }
 

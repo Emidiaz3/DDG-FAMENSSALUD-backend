@@ -29,6 +29,49 @@ export class DepartamentoService {
     return { status: 'success', data };
   }
 
+  async listarPaginado(params: {
+    page: number;
+    limit: number;
+    search?: string;
+    pais_id?: number;
+  }): Promise<{ items: any[]; total: number }> {
+    const { page, limit, search, pais_id } = params;
+    const skip = (page - 1) * limit;
+
+    const qb = this.repo
+      .createQueryBuilder('d')
+      .select([
+        'd.departamento_id AS departamento_id',
+        'd.pais_id AS pais_id',
+        'd.nombre AS nombre',
+      ]);
+
+    if (pais_id) qb.andWhere('d.pais_id = :pid', { pid: pais_id });
+
+    if (search && search.trim() !== '') {
+      const term = `%${search.trim()}%`;
+      qb.andWhere('d.nombre LIKE :term', { term });
+    }
+
+    qb.orderBy('d.nombre', 'ASC').offset(skip).limit(limit);
+
+    const totalQb = qb.clone();
+    totalQb
+      .offset(undefined as any)
+      .limit(undefined as any)
+      .orderBy();
+    const total = await totalQb.getCount();
+
+    const rows = await qb.getRawMany();
+    const items = rows.map((r) => ({
+      departamento_id: Number(r.departamento_id),
+      pais_id: Number(r.pais_id),
+      nombre: r.nombre,
+    }));
+
+    return { items, total };
+  }
+
   async crear(dto: CrearDepartamentoDto, ctx?: AuditContext) {
     return this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(Departamento);
