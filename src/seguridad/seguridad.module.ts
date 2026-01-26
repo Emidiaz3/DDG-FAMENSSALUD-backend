@@ -16,6 +16,8 @@ import { AuthController } from './auth/auth.controller';
 import { JwtStrategy } from './auth/jwt.strategy';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { Afiliado } from 'src/afiliados/entities/afiliado.entity';
+import { RolController } from './rol.controller';
+import { RolService } from './rol.service';
 
 @Module({
   imports: [
@@ -30,8 +32,8 @@ import { Afiliado } from 'src/afiliados/entities/afiliado.entity';
       }),
     }),
   ],
-  controllers: [UsuarioController, AuthController],
-  providers: [UsuarioService, AuthService, JwtStrategy, JwtAuthGuard],
-  exports: [UsuarioService],
+  controllers: [UsuarioController, AuthController, RolController],
+  providers: [UsuarioService, AuthService, RolService, JwtStrategy, JwtAuthGuard],
+  exports: [UsuarioService, RolService],
 })
 export class SeguridadModule {}
