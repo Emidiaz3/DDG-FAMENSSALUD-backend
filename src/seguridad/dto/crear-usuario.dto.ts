@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   MinLength,
+  IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -26,6 +27,9 @@ export class CrearUsuarioDto {
 
   @Type(() => Number) // 👈 transforma el JSON a number
   @IsInt()
+  @IsIn([1, 3], {
+    message: 'Solo se permite crear usuarios con rol ADMINISTRADOR (1) u OPERADOR (3)',
+  })
   rol_id: number; // 👈 ahora es number
 
   @IsString()

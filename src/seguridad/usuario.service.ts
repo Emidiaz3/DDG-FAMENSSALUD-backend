@@ -1,5 +1,5 @@
 // src/seguridad/usuario.service.ts
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Usuario } from './entities/usuario.entity';
@@ -8,6 +8,9 @@ import * as bcrypt from 'bcrypt';
 import { generarUsernameBase } from 'src/afiliados/utils/username.util';
 import { Afiliado } from 'src/afiliados/entities/afiliado.entity';
 import { UsuarioListItemDto } from './dto/usuario-list-item.dto';
+import { RolService } from './rol.service';
+import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto';
+import { CambiarContrasenaDto } from './dto/cambiar-contrasena.dto';
 
 @Injectable()
 export class UsuarioService {
@@ -16,6 +19,7 @@ export class UsuarioService {
   constructor(
     @InjectRepository(Usuario)
     private readonly usuarioRepo: Repository<Usuario>,
+    private readonly rolService: RolService,
   ) {}
 
   async listarPaginado(params: {
@@ -43,6 +47,7 @@ export class UsuarioService {
         'r.nombre AS rol_nombre',
         'u.es_activo AS es_activo',
         'CONVERT(varchar(10), u.creado_en, 23) AS creado_en',
+        'u.ultimo_login AS ultimo_login',
       ])
       .where('u.es_activo = 1');
 
@@ -97,7 +102,52 @@ export class UsuarioService {
     return { items, total };
   }
 
+  async obtenerPorId(id: number): Promise<Usuario> {
+    const usuario = await this.usuarioRepo.findOne({
+      where: { usuario_id: id },
+      relations: ['rol'],
+    });
+
+    if (!usuario) {
+      throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
+    }
+
+    return usuario;
+  }
+  
   async crear(dto: CrearUsuarioDto): Promise<Usuario> {
+
+    const rol = await this.rolService.obtenerPorId(dto.rol_id);
+    if (!rol) {
+      throw new BadRequestException(`El rol con ID ${dto.rol_id} no existe`);
+    }
+
+    if (!this.rolService.esRolPermitidoParaCreacion(dto.rol_id)) {
+      throw new BadRequestException(
+        'Solo se permite crear usuarios con rol ADMINISTRADOR u OPERADOR',
+      );
+    }
+
+    // Validar que el nombre de usuario no exista
+    const existeUsuario = await this.existsByNombreUsuario(dto.nombre_usuario);
+    if (existeUsuario) {
+      throw new ConflictException(
+        `Ya existe un usuario con el nombre "${dto.nombre_usuario}"`,
+      );
+    }
+
+    // Validar que el correo no exista (si se proporciona)
+    if (dto.correo) {
+      const existeCorreo = await this.usuarioRepo.count({
+        where: { correo: dto.correo },
+      });
+      if (existeCorreo > 0) {
+        throw new ConflictException(
+          `Ya existe un usuario con el correo "${dto.correo}"`,
+        );
+      }
+    }
+
     const hash = await bcrypt.hash(dto.contrasena, 10);
 
     const usuario = this.usuarioRepo.create({
@@ -112,6 +162,121 @@ export class UsuarioService {
 
     return this.usuarioRepo.save(usuario);
   }
+
+
+  async actualizar(id: number, dto: ActualizarUsuarioDto): Promise<Usuario> {
+    const usuario = await this.obtenerPorId(id);
+
+    // Validar que no se pueda editar usuarios con rol AFILIADO o MAESTRO
+    if (usuario.rol_id === 2 || usuario.rol_id === 4) {
+      throw new BadRequestException(
+        'No se puede editar usuarios con rol AFILIADO o MAESTRO',
+      );
+    }
+
+    // Si se cambia el nombre de usuario, validar que no exista
+    if (dto.nombre_usuario && dto.nombre_usuario !== usuario.nombre_usuario) {
+      const existeUsuario = await this.usuarioRepo.count({
+        where: { nombre_usuario: dto.nombre_usuario },
+      });
+      if (existeUsuario > 0) {
+        throw new ConflictException(
+          `Ya existe un usuario con el nombre "${dto.nombre_usuario}"`,
+        );
+      }
+    }
+
+    // Si se cambia el correo, validar que no exista
+    if (dto.correo && dto.correo !== usuario.correo) {
+      const existeCorreo = await this.usuarioRepo.count({
+        where: { correo: dto.correo },
+      });
+      if (existeCorreo > 0) {
+        throw new ConflictException(
+          `Ya existe un usuario con el correo "${dto.correo}"`,
+        );
+      }
+    }
+
+    // Si se cambia el rol, validar que sea permitido
+    if (dto.rol_id && dto.rol_id !== usuario.rol_id) {
+      const rol = await this.rolService.obtenerPorId(dto.rol_id);
+      if (!rol) {
+        throw new BadRequestException(`El rol con ID ${dto.rol_id} no existe`);
+      }
+
+      if (!this.rolService.esRolPermitidoParaCreacion(dto.rol_id)) {
+        throw new BadRequestException(
+          'Solo se permite asignar rol ADMINISTRADOR u OPERADOR',
+        );
+      }
+    }
+
+    
+
+    // Actualizar campos
+    Object.assign(usuario, dto);
+
+    return this.usuarioRepo.save(usuario);
+  }
+
+
+  async anular(id: number): Promise<Usuario> {
+    const usuario = await this.obtenerPorId(id);
+
+    // Validar que no se pueda anular usuarios con rol AFILIADO o MAESTRO
+    if (usuario.rol_id === 2 || usuario.rol_id === 4) {
+      throw new BadRequestException(
+        'No se puede anular usuarios con rol AFILIADO o MAESTRO',
+      );
+    }
+
+    if (!usuario.es_activo) {
+      throw new BadRequestException('El usuario ya está inactivo');
+    }
+
+    usuario.es_activo = false;
+    return this.usuarioRepo.save(usuario);
+  }
+
+  async activar(id: number): Promise<Usuario> {
+    const usuario = await this.obtenerPorId(id);
+
+    if (usuario.es_activo) {
+      throw new BadRequestException('El usuario ya está activo');
+    }
+
+    usuario.es_activo = true;
+    return this.usuarioRepo.save(usuario);
+  }
+
+  async cambiarContrasena(
+    id: number,
+    dto: CambiarContrasenaDto,
+  ): Promise<void> {
+    const usuario = await this.obtenerPorId(id);
+
+    // Validar contraseña actual
+    const esValida = await bcrypt.compare(
+      dto.contrasena_actual,
+      usuario.contrasena_hash,
+    );
+    if (!esValida) {
+      throw new BadRequestException('La contraseña actual es incorrecta');
+    }
+
+    // Validar que las nuevas contraseñas coincidan
+    if (dto.contrasena_nueva !== dto.confirmar_contrasena) {
+      throw new BadRequestException('Las contraseñas nuevas no coinciden');
+    }
+
+    // Hash de la nueva contraseña
+    const hash = await bcrypt.hash(dto.contrasena_nueva, 10);
+    usuario.contrasena_hash = hash;
+
+    await this.usuarioRepo.save(usuario);
+  }
+  
 
   // 👇 para login / refresh / updates genéricos
   async save(usuario: Usuario): Promise<Usuario> {

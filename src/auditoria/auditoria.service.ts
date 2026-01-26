@@ -62,4 +62,93 @@ export class AuditoriaService {
       }),
     );
   }
+  // Agregar este método en auditoria.service.ts
+
+async listar(filters: {
+  page: number;
+  limit: number;
+  categoria?: string;
+  tipo_evento?: string;
+  usuario_id?: number;
+  es_exitoso?: boolean;
+  entidad_esquema?: string;
+  entidad_tabla?: string;
+  fecha_desde?: string;
+  fecha_hasta?: string;
+  search?: string;
+}): Promise<{ items: LogEvento[]; total: number }> {
+  const {
+    page,
+    limit,
+    categoria,
+    tipo_evento,
+    usuario_id,
+    es_exitoso,
+    entidad_esquema,
+    entidad_tabla,
+    fecha_desde,
+    fecha_hasta,
+    search,
+  } = filters;
+
+  const queryBuilder = this.logRepo
+    .createQueryBuilder('log')
+    .leftJoinAndSelect('log.usuario', 'usuario');
+
+  // Filtros específicos
+  if (categoria) {
+    queryBuilder.andWhere('log.categoria = :categoria', { categoria });
+  }
+
+  if (tipo_evento) {
+    queryBuilder.andWhere('log.tipo_evento = :tipo_evento', { tipo_evento });
+  }
+
+  if (usuario_id) {
+    queryBuilder.andWhere('log.usuario_id = :usuario_id', { usuario_id });
+  }
+
+  if (es_exitoso !== undefined) {
+    queryBuilder.andWhere('log.es_exitoso = :es_exitoso', { es_exitoso });
+  }
+
+  if (entidad_esquema) {
+    queryBuilder.andWhere('log.entidad_esquema = :entidad_esquema', {
+      entidad_esquema,
+    });
+  }
+
+  if (entidad_tabla) {
+    queryBuilder.andWhere('log.entidad_tabla = :entidad_tabla', {
+      entidad_tabla,
+    });
+  }
+
+  if (fecha_desde) {
+    queryBuilder.andWhere('log.fecha_hora >= :fecha_desde', { fecha_desde });
+  }
+
+  if (fecha_hasta) {
+    queryBuilder.andWhere('log.fecha_hora <= :fecha_hasta', { fecha_hasta });
+  }
+
+  // Búsqueda general
+  if (search) {
+    queryBuilder.andWhere(
+      '(log.descripcion LIKE :search OR log.entidad_id LIKE :search OR log.ip_origen LIKE :search)',
+      { search: `%${search}%` },
+    );
+  }
+
+  // Paginación
+  const skip = (page - 1) * limit;
+  queryBuilder.skip(skip).take(limit);
+
+  // Ordenar por fecha descendente (más recientes primero)
+  queryBuilder.orderBy('log.fecha_hora', 'DESC');
+
+  const [items, total] = await queryBuilder.getManyAndCount();
+
+  return { items, total };
+}
 }
