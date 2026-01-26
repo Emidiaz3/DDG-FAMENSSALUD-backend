@@ -1,3 +1,5 @@
+import { TipoPrestamo } from 'src/prestamos/entities/tipo-prestamo.entity';
+
 export type PlanillaExcelRow = {
   codigo_trabajador: string;
   nombres: string;
@@ -6,6 +8,8 @@ export type PlanillaExcelRow = {
 
 export type PlanillaPreviewPrestamo = {
   prestamo_id: number;
+  tipo_prestamo_id: number;
+  tipo_prestamo: TipoPrestamo;
   numero_prestamo: number;
   cuota_objetivo: number;
 

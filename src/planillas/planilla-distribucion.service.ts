@@ -25,6 +25,8 @@ export class PlanillaDistribucionService {
       if (saldo <= 0) {
         detalles.push({
           prestamo_id: p.prestamo_id,
+          tipo_prestamo_id: p.tipo_prestamo_id,
+          tipo_prestamo: p.tipo_prestamo,
           numero_prestamo: p.numero_prestamo,
           cuota_objetivo: this.r2(Number(p.cuota_mensual)),
           interes_objetivo: this.r2(Number(p.monto_interes_cuota)),
@@ -51,6 +53,8 @@ export class PlanillaDistribucionService {
 
       detalles.push({
         prestamo_id: p.prestamo_id,
+        tipo_prestamo_id: p.tipo_prestamo_id,
+        tipo_prestamo: p.tipo_prestamo,
         numero_prestamo: p.numero_prestamo,
         cuota_objetivo: cuotaObjetivo,
         interes_objetivo: interesObj,

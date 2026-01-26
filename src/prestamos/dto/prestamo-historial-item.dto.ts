@@ -24,6 +24,9 @@ export class PrestamoHistorialItemDto {
   monto_prestamo: number;
   cuota_mensual: number;
 
+  cuota_mensual_capital: number;
+  cuota_mensual_interes: number;
+
   monto_adeuda: number; // monto_saldo
   monto_pagado: number; // monto_total_pagado
 

@@ -803,6 +803,9 @@ export class PrestamosService {
       monto_prestamo: Number(p.monto_prestamo),
       cuota_mensual: Number(p.cuota_mensual),
 
+      cuota_mensual_capital: Number(p.monto_capital_cuota),
+      cuota_mensual_interes: Number(p.monto_interes_cuota),
+
       monto_adeuda: Number(p.monto_saldo),
       monto_pagado: Number(p.monto_total_pagado),
 

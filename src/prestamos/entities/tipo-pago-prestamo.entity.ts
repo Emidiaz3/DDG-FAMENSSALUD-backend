@@ -9,6 +9,9 @@ export class TipoPagoPrestamo {
   @Column({ type: 'char', length: 1, nullable: true })
   codigo: string | null;
 
+  @Column({ type: 'nvarchar', length: 50 })
+  nombre: string;
+
   @Column({ type: 'nvarchar', length: 80 })
   descripcion: string;
 }

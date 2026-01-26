@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { Prestamo } from './entities/prestamo.entity';
 import { Pago } from './entities/pago.entity';
 import { AfiliacionHistorial } from '../afiliados/entities/afiliacion-historial.entity';
@@ -15,6 +15,7 @@ import {
 } from './prestamos.constants';
 import { LogEvento } from 'src/auditoria/entities/log-event.entity';
 import { RegistrarPagoCancelacionTotalDto } from './dto/registrar-pago-cancelacion.dto';
+import { TipoPagoPrestamo } from './entities/tipo-pago-prestamo.entity';
 
 @Injectable()
 export class PagosService {
@@ -28,8 +29,24 @@ export class PagosService {
     @InjectRepository(AfiliacionHistorial)
     private readonly afiliacionHistRepo: Repository<AfiliacionHistorial>,
 
+    @InjectRepository(TipoPagoPrestamo)
+    private readonly tipoPagoPrestamoRepo: Repository<TipoPagoPrestamo>,
+
     private readonly dataSource: DataSource,
   ) {}
+
+  async listarTiposPagoPorCodigo(
+    codigos: string[],
+  ): Promise<TipoPagoPrestamo[]> {
+    return this.tipoPagoPrestamoRepo.find({
+      where: {
+        codigo: In(codigos),
+      },
+      order: {
+        tipo_pago_prestamo_id: 'ASC',
+      },
+    });
+  }
 
   // ---------- REGISTRAR PAGO NORMAL (tipo 2) ----------
   async registrarPagoNormal(dto: RegistrarPagoNormalDto): Promise<Pago> {

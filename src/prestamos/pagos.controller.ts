@@ -6,16 +6,35 @@ import {
   Post,
   Patch,
   Req,
+  Get,
+  Query,
 } from '@nestjs/common';
 import { PagosService } from './pagos.service';
 import { RegistrarPagoNormalDto } from './dto/registrar-pago-normal.dto';
 import { AnularPagoDto } from './dto/anular-pago.dto';
 import { Pago } from './entities/pago.entity';
 import { RegistrarPagoCancelacionTotalDto } from './dto/registrar-pago-cancelacion.dto';
+import { TipoPagoPrestamo } from './entities/tipo-pago-prestamo.entity';
+import { ApiResponse } from 'src/common/interfaces/api-response.interface';
 
 @Controller('pagos')
 export class PagosController {
   constructor(private readonly pagosService: PagosService) {}
+
+  @Get('tipos-pago-prestamo')
+  async listarTiposPago(
+    @Query('codigos') codigos: string,
+  ): Promise<ApiResponse<TipoPagoPrestamo[]>> {
+    const listaCodigos = codigos ? codigos.split(',').map((c) => c.trim()) : [];
+
+    const data = await this.pagosService.listarTiposPagoPorCodigo(listaCodigos);
+
+    return {
+      status: 'success',
+      data,
+      message: 'Tipos de pago de préstamo',
+    };
+  }
 
   // POST /pagos/normal
   @Post('normal')

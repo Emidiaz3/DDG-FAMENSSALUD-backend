@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, DeepPartial, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Afiliado } from 'src/afiliados/entities/afiliado.entity';
 import { AfiliacionHistorial } from 'src/afiliados/entities/afiliacion-historial.entity';
@@ -34,7 +34,12 @@ import { Planilla } from 'src/operaciones/entities/planilla.entity';
 @Injectable()
 export class PlanillasService {
   // Temporal: snapshot en memoria (ideal: tabla/redis)
-  private previewStore = new Map<string, PlanillaPreviewResponse>();
+
+  private readonly PREVIEW_TTL_MS = 6 * 60 * 60 * 1000; // 6 horas (ajusta)
+  private previewStore = new Map<
+    string,
+    { snapshot: PlanillaPreviewResponse; expiresAt: number }
+  >();
 
   constructor(
     private readonly dataSource: DataSource,
@@ -61,7 +66,16 @@ export class PlanillasService {
     private readonly distribucion: PlanillaDistribucionService,
     private readonly params: ParametrosGlobalesService,
     private readonly auditoria: AuditoriaService,
-  ) {}
+  ) {
+    setInterval(() => this.purgeExpiredPreviews(), 10 * 60 * 1000); // cada 10 min
+  }
+
+  private purgeExpiredPreviews() {
+    const now = Date.now();
+    for (const [token, entry] of this.previewStore.entries()) {
+      if (entry.expiresAt <= now) this.previewStore.delete(token);
+    }
+  }
 
   async previewExcel(
     fileBuffer: Buffer,
@@ -97,6 +111,7 @@ export class PlanillasService {
           afiliado_id: afiliado.afiliado_id,
           estado_prestamo_id: EstadoPrestamoEnum.PENDIENTE,
         },
+        relations: ['tipo_prestamo'],
         order: { numero_prestamo: 'ASC' },
       });
 
@@ -162,7 +177,10 @@ export class PlanillasService {
       resumen,
     };
 
-    this.previewStore.set(preview_token, response);
+    this.previewStore.set(preview_token, {
+      snapshot: response,
+      expiresAt: Date.now() + this.PREVIEW_TTL_MS,
+    });
 
     await this.auditoria.log({
       ctx,
@@ -181,7 +199,24 @@ export class PlanillasService {
   }
 
   async confirm(dto: ConfirmarPlanillaDto, ctx?: AuditContext) {
-    const snapshot = this.previewStore.get(dto.preview_token);
+    const entry = this.previewStore.get(dto.preview_token);
+
+    if (!entry) {
+      throw new NotFoundException({
+        status: 'error',
+        message: 'El preview_token no existe o expiró. Vuelva a previsualizar.',
+      });
+    }
+
+    if (Date.now() > entry.expiresAt) {
+      this.previewStore.delete(dto.preview_token);
+      throw new NotFoundException({
+        status: 'error',
+        message: 'El preview_token expiró. Vuelva a previsualizar.',
+      });
+    }
+
+    const snapshot = entry.snapshot;
 
     if (!snapshot) {
       throw new NotFoundException({
@@ -469,6 +504,38 @@ export class PlanillasService {
     });
   }
 
+  async cancelPreview(previewToken: string, ctx?: AuditContext) {
+    const entry = this.previewStore.get(previewToken);
+
+    if (!entry) {
+      throw new NotFoundException({
+        status: 'error',
+        message: 'El preview_token no existe o ya expiró.',
+      });
+    }
+
+    this.previewStore.delete(previewToken);
+
+    await this.auditoria.log({
+      ctx,
+      categoria: 'PLANILLAS',
+      tipo_evento: 'PLANILLA_PREVIEW_CANCEL',
+      entidad_esquema: 'operaciones',
+      entidad_tabla: 'planilla_preview',
+      entidad_id: previewToken,
+      descripcion:
+        'Se canceló la previsualización de planilla (snapshot eliminado).',
+      datos_anteriores: { expiresAt: new Date(entry.expiresAt).toISOString() },
+      datos_nuevos: null,
+      es_exitoso: true,
+    });
+
+    return {
+      status: 'success',
+      message: 'Previsualización cancelada. El snapshot fue eliminado.',
+    };
+  }
+
   /* ==========================
      Helpers
      ========================== */
@@ -506,12 +573,7 @@ export class PlanillasService {
 
   private generarCodigoPlanilla(anio: number, mes: number, tipo: string) {
     const mm = String(mes).padStart(2, '0');
-    const t = (tipo ?? 'PLANILLA')
-      .toUpperCase()
-      .replace(/\s+/g, '_')
-      .slice(0, 12);
-    // Ej: PL-2026-01-PLANILLA-1736950000
-    return `PL-${anio}-${mm}-${t}-${Date.now()}`;
+    return `R${anio}-${mm}`;
   }
 
   private r2(n: number) {

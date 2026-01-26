@@ -6,7 +6,6 @@ import {
   NotFoundException,
   Param,
   ParseIntPipe,
-  Patch,
   Post,
   Put,
   Query,
@@ -15,8 +14,6 @@ import {
 } from '@nestjs/common';
 import { AfiliadosService } from './afiliados.service';
 import { Afiliado } from './entities/afiliado.entity';
-
-// Imports de tu arquitectura actual
 import { PaginatedResponse } from '../common/interfaces/api-response.interface';
 import { JwtAuthGuard } from '../seguridad/auth/jwt-auth.guard';
 import { GuardarAfiliadoDto } from './dto/crear-afiliado.dto';
