@@ -79,27 +79,30 @@ export class ValoresService {
 
   // Método para obtener valores agrupados por categoría (para el frontend)
   async obtenerValoresAgrupados(): Promise<{
-    ajusteGeneral: Record<string, any>;
-    parametrosAfiliacion: Record<string, any>;
-    parametrosPrestamosRetiro: Record<string, any>;
+    ajusteGeneral: Record<string, ParametroGlobal>;
+    parametrosAfiliacion: Record<string, ParametroGlobal>;
+    parametrosPrestamosRetiro: Record<string, ParametroGlobal>;
   }> {
     const todos = await this.listarTodos();
 
-    const ajusteGeneral = {};
-    const parametrosAfiliacion = {};
-    const parametrosPrestamosRetiro = {};
+    const ajusteGeneral: Record<string, ParametroGlobal> = {};
+    const parametrosAfiliacion: Record<string, ParametroGlobal> = {};
+    const parametrosPrestamosRetiro: Record<string, ParametroGlobal> = {};
+
+    // Claves específicas para cada categoría
+    const clavesAjusteGeneral = ['IGV_PORC', 'UIT_MONTO'];
+    const clavesAfiliacion = ['EDAD_MINIMA_AFILIACION', 'EDAD_MAXIMA_AFILIACION'];
 
     todos.forEach((param) => {
       const clave = param.clave;
-      const valor = param.valor;
 
-      // Categorizar según la clave
-      if (clave.includes('IGV') || clave.includes('UIT')) {
-        ajusteGeneral[clave] = { ...param };
-      } else if (clave.includes('EDAD')) {
-        parametrosAfiliacion[clave] = { ...param };
+      if (clavesAjusteGeneral.includes(clave)) {
+        ajusteGeneral[clave] = param;
+      } else if (clavesAfiliacion.includes(clave)) {
+        parametrosAfiliacion[clave] = param;
       } else {
-        parametrosPrestamosRetiro[clave] = { ...param };
+        // Todo lo demás va a préstamos y retiro
+        parametrosPrestamosRetiro[clave] = param;
       }
     });
 
