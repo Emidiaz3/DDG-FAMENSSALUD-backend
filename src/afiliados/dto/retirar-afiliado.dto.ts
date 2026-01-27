@@ -1,6 +1,7 @@
 // src/afiliados/dto/retirar-afiliado.dto.ts
 import {
   IsDateString,
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -14,10 +15,9 @@ export class RetirarAfiliadoDto {
   @IsDateString()
   fecha_retiro?: string; // si no viene, usamos hoy
 
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
-  motivo_retiro: string;
+  @IsInt()
+  @Min(1)
+  motivo_retiro_id: number; // 👈 NUEVO (FK)
 
   @IsOptional()
   @IsString()
@@ -27,12 +27,4 @@ export class RetirarAfiliadoDto {
   @IsNumber()
   @Min(0)
   monto_aportes_acumulado: number; // 7413.25
-
-  @IsNumber()
-  @Min(0)
-  factor_beneficio: number; // 5
-
-  @IsNumber()
-  @Min(0)
-  porcentaje_gastos_adm: number; // 5 (porcentaje)
 }

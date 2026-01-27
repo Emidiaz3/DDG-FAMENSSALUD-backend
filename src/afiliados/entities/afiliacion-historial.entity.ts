@@ -11,6 +11,7 @@ import { Afiliado } from './afiliado.entity';
 import { Exceso } from 'src/operaciones/entities/exceso.entity';
 import { Devolucion } from 'src/operaciones/entities/devolucion.entity';
 import { Retiro } from './retiro.entity';
+import { MotivoRetiro } from '../../catalogos/entities/motivo-retiro.entity';
 
 @Entity({ schema: 'nucleo', name: 'afiliacion_historial' })
 export class AfiliacionHistorial {
@@ -30,8 +31,11 @@ export class AfiliacionHistorial {
   @Column({ type: 'date', nullable: true })
   fecha_fin?: Date | null;
 
-  @Column({ type: 'nvarchar', length: 100, nullable: true })
-  motivo_retiro?: string | null;
+  @Column({ type: 'int', name: 'motivo_retiro_id', nullable: true })
+  motivo_retiro_id?: number | null;
+
+  // @Column({ type: 'nvarchar', length: 100, nullable: true })
+  // motivo_retiro?: string | null;
 
   @Column({ type: 'bit' })
   es_activo: boolean;
@@ -44,4 +48,15 @@ export class AfiliacionHistorial {
 
   @OneToMany(() => Retiro, (r) => r.afiliacion_historial)
   retiros: Retiro[];
+
+  // ✅ Relación al catálogo
+  @ManyToOne(() => MotivoRetiro, (m) => m.afiliaciones_historial, {
+    onDelete: 'NO ACTION',
+    nullable: true,
+  })
+  @JoinColumn({
+    name: 'motivo_retiro_id',
+    referencedColumnName: 'motivo_retiro_id',
+  })
+  motivo_retiro?: MotivoRetiro | null;
 }

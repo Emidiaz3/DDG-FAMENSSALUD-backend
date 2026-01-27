@@ -7,14 +7,24 @@ import { SeguridadModule } from 'src/seguridad/seguridad.module';
 import { AfiliacionHistorial } from './entities/afiliacion-historial.entity';
 import { Aporte } from 'src/aportes/entities/aporte.entity';
 import { Prestamo } from 'src/prestamos/entities/prestamo.entity';
+import { MotivoRetiro } from '../catalogos/entities/motivo-retiro.entity';
+import { ParametrosGlobalesService } from 'src/configuracion/parametros-globales.service';
+import { ParametroGlobal } from 'src/configuracion/entities/parametro-global.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Afiliado, AfiliacionHistorial, Aporte, Prestamo]),
+    TypeOrmModule.forFeature([
+      Afiliado,
+      AfiliacionHistorial,
+      Aporte,
+      Prestamo,
+      MotivoRetiro,
+      ParametroGlobal,
+    ]),
     SeguridadModule,
   ],
   controllers: [AfiliadosController],
-  providers: [AfiliadosService],
+  providers: [AfiliadosService, ParametrosGlobalesService],
   exports: [AfiliadosService], // Exportar si otros módulos lo necesitan
 })
 export class AfiliadosModule {}

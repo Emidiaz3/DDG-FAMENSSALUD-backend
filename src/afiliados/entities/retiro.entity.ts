@@ -11,6 +11,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { MotivoRetiro } from '../../catalogos/entities/motivo-retiro.entity';
 
 @Entity({ schema: 'nucleo', name: 'retiro' })
 @Index('UX_retiro_afiliacion_historial', ['afiliacion_historial_id'], {
@@ -30,8 +31,11 @@ export class Retiro {
   @Column({ type: 'datetime2', precision: 0, name: 'fecha_retiro' })
   fecha_retiro: Date;
 
-  @Column({ type: 'nvarchar', length: 100, name: 'motivo_retiro' })
-  motivo_retiro: string;
+  @Column({ type: 'int', name: 'motivo_retiro_id' })
+  motivo_retiro_id: number;
+
+  // @Column({ type: 'nvarchar', length: 100, name: 'motivo_retiro' })
+  // motivo_retiro: string;
 
   @Column({
     type: 'nvarchar',
@@ -111,4 +115,12 @@ export class Retiro {
     referencedColumnName: 'afiliacion_historial_id',
   })
   afiliacion_historial: AfiliacionHistorial;
+
+  // ✅ Relación al catálogo
+  @ManyToOne(() => MotivoRetiro, (m) => m.retiros, { onDelete: 'NO ACTION' })
+  @JoinColumn({
+    name: 'motivo_retiro_id',
+    referencedColumnName: 'motivo_retiro_id',
+  })
+  motivo_retiro: MotivoRetiro;
 }

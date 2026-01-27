@@ -21,6 +21,8 @@ import { Retiro } from './entities/retiro.entity';
 import { Exceso } from 'src/operaciones/entities/exceso.entity';
 import { Devolucion } from 'src/operaciones/entities/devolucion.entity';
 import Decimal from 'decimal.js';
+import { MotivoRetiro } from '../catalogos/entities/motivo-retiro.entity';
+import { ParametrosGlobalesService } from 'src/configuracion/parametros-globales.service';
 
 @Injectable()
 export class AfiliadosService {
@@ -39,6 +41,10 @@ export class AfiliadosService {
 
     private readonly usuarioService: UsuarioService,
     private readonly dataSource: DataSource, // para transacción
+    private readonly parametrosGlobalesService: ParametrosGlobalesService,
+
+    @InjectRepository(MotivoRetiro)
+    private readonly motivoRetiroRepo: Repository<MotivoRetiro>,
   ) {}
 
   async obtenerDetalleAfiliado(
@@ -364,7 +370,7 @@ export class AfiliadosService {
         afiliado_id: afiliadoGuardado.afiliado_id,
         fecha_inicio: dto.fecha_ingreso as any,
         fecha_fin: null,
-        motivo_retiro: null,
+        motivo_retiro_id: null,
         es_activo: true,
       });
 
@@ -420,6 +426,7 @@ export class AfiliadosService {
       const prestamoRepo = manager.getRepository(Prestamo);
       const excesoRepo = manager.getRepository(Exceso);
       const devolucionRepo = manager.getRepository(Devolucion);
+      const motivoRetiroRepo = manager.getRepository(MotivoRetiro);
 
       // 1) Afiliado existe?
       const afiliado = await afiliadoRepo.findOne({
@@ -433,7 +440,7 @@ export class AfiliadosService {
         });
       }
 
-      // 2) Traer afiliación activa (con lock para evitar doble retiro concurrente)
+      // 2) Afiliación activa (lock)
       const historialActivo = await historialRepo
         .createQueryBuilder('h')
         .setLock('pessimistic_write')
@@ -449,16 +456,33 @@ export class AfiliadosService {
       }
 
       const historialId = historialActivo.afiliacion_historial_id;
-      // 3) Validar préstamos: todos cancelados en ese historial
+
+      // 2.1) Validar motivo retiro
+      const motivo = await motivoRetiroRepo.findOne({
+        where: { motivo_retiro_id: dto.motivo_retiro_id, es_activo: true },
+      });
+
+      if (!motivo) {
+        throw new BadRequestException({
+          status: 'error',
+          message: 'Motivo de retiro inválido o inactivo.',
+        });
+      }
+
+      // ✅ 2.2) Traer parámetros reales desde configuracion.parametro_global
+      const factorBeneficio =
+        await this.parametrosGlobalesService.getNumber('FACTOR_BENEFICIO');
+      const porcentajeGastosAdm =
+        await this.parametrosGlobalesService.getNumber(
+          'GASTOS_ADMIN_RETIRO_PORC',
+        );
+
+      // 3) Validar préstamos cancelados
       const prestamosPendientes = await prestamoRepo
         .createQueryBuilder('p')
         .where('p.afiliado_id = :afiliadoId', { afiliadoId })
-        .andWhere('p.afiliacion_historial_id = :historialId', {
-          historialId: historialActivo.afiliacion_historial_id,
-        })
-        .andWhere('p.estado_prestamo_id <> :cancelado', {
-          cancelado: 2, // Estado Cancelado
-        })
+        .andWhere('p.afiliacion_historial_id = :historialId', { historialId })
+        .andWhere('p.estado_prestamo_id <> :cancelado', { cancelado: 2 })
         .getCount();
 
       if (prestamosPendientes > 0) {
@@ -469,7 +493,7 @@ export class AfiliadosService {
         });
       }
 
-      // 4) Validar que no le debas nada: sum(exceso) - sum(devolucion) = 0
+      // 4) Validar saldos (exceso - devolución = 0)
       const rawExceso = await excesoRepo
         .createQueryBuilder('e')
         .select(
@@ -479,8 +503,6 @@ export class AfiliadosService {
         .where('e.afiliado_id = :afiliadoId', { afiliadoId })
         .andWhere('e.afiliacion_historial_id = :historialId', { historialId })
         .getRawOne<{ sumExceso: string }>();
-
-      const sumExceso = rawExceso?.sumExceso ?? '0';
 
       const rawDevo = await devolucionRepo
         .createQueryBuilder('d')
@@ -492,10 +514,8 @@ export class AfiliadosService {
         .andWhere('d.afiliacion_historial_id = :historialId', { historialId })
         .getRawOne<{ sumDevolucion: string }>();
 
-      const sumDevolucion = rawDevo?.sumDevolucion ?? '0';
-
-      const excesoTotal = new Decimal(sumExceso ?? '0');
-      const devolucionTotal = new Decimal(sumDevolucion ?? '0');
+      const excesoTotal = new Decimal(rawExceso?.sumExceso ?? '0');
+      const devolucionTotal = new Decimal(rawDevo?.sumDevolucion ?? '0');
       const saldoDeuda = excesoTotal.minus(devolucionTotal);
 
       if (!saldoDeuda.equals(0)) {
@@ -507,32 +527,32 @@ export class AfiliadosService {
         });
       }
 
-      // 5) Calcular snapshot (usando Decimal)
+      // 5) Snapshot cálculo
       const fechaRetiro = dto.fecha_retiro
         ? new Date(dto.fecha_retiro)
         : new Date();
 
       const aportes = new Decimal(dto.monto_aportes_acumulado);
-      const factor = new Decimal(dto.factor_beneficio);
-      const pctGastos = new Decimal(dto.porcentaje_gastos_adm);
+      const factor = new Decimal(factorBeneficio);
+      const pctGastos = new Decimal(porcentajeGastosAdm);
 
-      const montoFactor = aportes.mul(factor); // aportes * factor
-      const montoGastos = montoFactor.mul(pctGastos).div(100); // * pct / 100
+      const montoFactor = aportes.mul(factor);
+      const montoGastos = montoFactor.mul(pctGastos).div(100);
       const montoRetiro = montoFactor.minus(montoGastos);
 
-      // Redondeo a 2 decimales (banco/contable)
       const aportes2 = aportes.toDecimalPlaces(2);
       const montoFactor2 = montoFactor.toDecimalPlaces(2);
       const montoGastos2 = montoGastos.toDecimalPlaces(2);
       const montoRetiro2 = montoRetiro.toDecimalPlaces(2);
 
-      // 6) Insertar retiro (snapshot)
+      // 6) Insertar retiro
       const retiro = retiroRepo.create({
         afiliado_id: afiliadoId,
-        afiliacion_historial_id: historialActivo.afiliacion_historial_id,
+        afiliacion_historial_id: historialId,
 
         fecha_retiro: fechaRetiro,
-        motivo_retiro: dto.motivo_retiro,
+        motivo_retiro_id: motivo.motivo_retiro_id,
+
         observacion: dto.observacion ?? null,
 
         monto_aportes_acumulado: aportes2.toFixed(2),
@@ -543,27 +563,22 @@ export class AfiliadosService {
         monto_retiro: montoRetiro2.toFixed(2),
 
         usuario_id: usuarioId ?? null,
-        // creado_en lo setea default en BD, pero por seguridad lo puedes setear aquí
         creado_en: new Date(),
       });
 
       const retiroGuardado = await retiroRepo.save(retiro);
 
       // 7) Cerrar afiliación activa
-      historialActivo.fecha_fin = dto.fecha_retiro
-        ? new Date(dto.fecha_retiro)
-        : new Date();
-      historialActivo.motivo_retiro = dto.motivo_retiro;
+      historialActivo.fecha_fin = fechaRetiro;
+      historialActivo.motivo_retiro_id = motivo.motivo_retiro_id;
       historialActivo.es_activo = false;
       await historialRepo.save(historialActivo);
 
-      // 8) Update afiliado (baja)
+      // 8) Update afiliado
       afiliado.estado = false;
-      afiliado.fecha_inactivacion = dto.fecha_retiro
-        ? new Date(dto.fecha_retiro)
-        : new Date();
+      afiliado.fecha_inactivacion = fechaRetiro;
       afiliado.motivo_inactivacion =
-        dto.observacion ?? `Retiro por: ${dto.motivo_retiro}`;
+        dto.observacion ?? `Retiro por: ${motivo.nombre}`;
       afiliado.retiro_actual_id = retiroGuardado.retiro_id;
       await afiliadoRepo.save(afiliado);
 
