@@ -143,13 +143,9 @@ export class PlanillasService {
       });
     }
 
-    const excesos = general
-      .filter((g) => g.exceso > 0)
-      .map((g) => ({
-        codigo_trabajador: g.codigo_trabajador,
-        nombre: g.nombre,
-        monto_exceso: g.exceso,
-      }));
+    const excesos = general.filter((g) => g.exceso > 0);
+
+    const hoy = new Date();
 
     const resumen = {
       total_registros: rows.length,
@@ -158,9 +154,11 @@ export class PlanillasService {
       total_monto_planilla: this.r2(
         general.reduce((acc, x) => acc + x.monto_planilla, 0),
       ),
-      total_exceso: this.r2(
-        excesos.reduce((acc, x) => acc + x.monto_exceso, 0),
-      ),
+      // total_exceso: this.r2(
+      //   excesos.reduce((acc, x) => acc + x.monto_exceso, 0),
+      // ),
+      total_exceso: this.r2(excesos.reduce((acc, x) => acc + x.exceso, 0)),
+
       total_faltante_objetivo: this.r2(
         general.reduce((acc, x) => acc + x.faltante_objetivo, 0),
       ),
@@ -171,6 +169,15 @@ export class PlanillasService {
     const response: PlanillaPreviewResponse = {
       preview_token,
       aporte_configurado: aporteMensual,
+
+      contexto: {
+        anio: hoy.getFullYear(),
+        mes: {
+          numero: hoy.getMonth() + 1,
+          nombre: this.nombreMes(hoy.getMonth() + 1),
+        },
+        fecha_proceso: this.formatFecha(hoy),
+      },
       general,
       excesos,
       errores,
@@ -584,5 +591,30 @@ export class PlanillasService {
     const v = this.r2(n);
     if (Math.abs(v) <= 0.009) return 0;
     return v;
+  }
+
+  private nombreMes(mes: number): string {
+    const meses = [
+      'Enero',
+      'Febrero',
+      'Marzo',
+      'Abril',
+      'Mayo',
+      'Junio',
+      'Julio',
+      'Agosto',
+      'Septiembre',
+      'Octubre',
+      'Noviembre',
+      'Diciembre',
+    ];
+    return meses[mes - 1] ?? '';
+  }
+
+  private formatFecha(d: Date): string {
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
   }
 }

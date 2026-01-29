@@ -49,12 +49,23 @@ export type PlanillaPreviewError = {
 export type PlanillaPreviewResponse = {
   preview_token: string;
   aporte_configurado: number;
+  contexto: {
+    anio: number;
+    mes: {
+      numero: number;
+      nombre: string;
+    };
+    fecha_proceso: string;
+  };
+
   general: PlanillaPreviewItem[];
-  excesos: Array<{
-    codigo_trabajador: string;
-    nombre: string;
-    monto_exceso: number;
-  }>;
+  // excesos: Array<{
+  //   codigo_trabajador: string;
+  //   nombre: string;
+  //   monto_exceso: number;
+  // }>;
+  excesos: PlanillaPreviewItem[]; // 👈 MISMO TIPO
+
   errores: PlanillaPreviewError[];
   resumen: {
     total_registros: number;
